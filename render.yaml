@@ -1,0 +1,55 @@
+# Render Infrastructure as Code Blueprint
+# https://render.com/docs/blueprint-spec
+
+services:
+  # 1. Frontend Web Service (Next.js 14)
+  - type: web
+    name: legal-intelligence-web
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: legal-intelligence-api
+          envVarKey: RENDER_EXTERNAL_URL
+
+  # 2. Backend API Service (FastAPI + Tesseract OCR + Poppler)
+  - type: web
+    name: legal-intelligence-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    disk:
+      name: uploads-data
+      mountPath: /data/uploads
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: legal-intelligence-db
+          property: connectionString
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: MAX_UPLOAD_MB
+        value: "20"
+      - key: OCR_LANG
+        value: "eng"
+
+# 3. Managed PostgreSQL Database
+databases:
+  - name: legal-intelligence-db
+    databaseName: legal
+    user: legal_user
+    plan: free
+    region: singapore
+    postgresMajorVersion: 16
